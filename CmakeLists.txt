@@ -15,9 +15,9 @@ FetchContent_MakeAvailable(ftxui)
 
 project(diffi LANGUAGES CXX VERSION 1.0.0)
 add_executable(diffi src/main.cpp)
-target_link_libraries(
+target_link_libraries(diffi
     PRIVATE
-    ftxui::Screen
+    ftxui::screen
     ftxui::dom
     ftxui::component
 )
