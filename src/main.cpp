@@ -15,7 +15,7 @@
 #include "ftxui/util/ref.hpp"
 
 int 
-main() 
+main(void) 
 {
     using namespace ftxui;
 
