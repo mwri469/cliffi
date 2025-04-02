@@ -42,7 +42,7 @@
    Component input_search = Input(&search, "");
    Component input_cmd = Input(&cmd, "/");
  
-   auto component = Container::Vertical({
+   auto component = Container::Horizontal({
        input_search,
        input_cmd,
    });
