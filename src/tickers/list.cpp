@@ -2,26 +2,55 @@
 * Copyright 2024 Martin Wright. All rights reserved.
 * Use of this source code is governed by the license found in the LICENSE file.
 */
+#include <algorithm>
 #include <chrono>
-#include <memory>
-#include <string>
-#include <vector>
+#include <cstdlib>
 #include <fstream>
-#include <cstdlib> 
-#include <sstream>
-#include <iomanip> 
-#include <iostream>
+#include <functional>
+#include <iomanip>
+#include <memory>
 #include <random>
+#include <sstream>
+#include <string>
 #include <thread>
+#include <vector>
 
 #include "list.hpp"
-#include "ftxui/util/ref.hpp"
-#include "ftxui/dom/elements.hpp"
 #include "ftxui/component/component.hpp"
-#include "ftxui/component/captured_mouse.hpp"
 #include "ftxui/component/component_base.hpp"
+#include "ftxui/component/event.hpp"
 #include "ftxui/component/screen_interactive.hpp"
+#include "ftxui/dom/elements.hpp"
 #include "ftxui/dom/table.hpp"
+#include "ftxui/util/ref.hpp"
+
+namespace {
+
+class SecuritiesComponent : public ftxui::ComponentBase {
+public:
+    explicit SecuritiesComponent(SecurityList* list) : _list(list) {}
+
+    bool Focusable() const override { return true; }
+
+    ftxui::Element OnRender() override {
+        using namespace ftxui;
+        return window(text("Securities"),
+            hbox({_list->render_table(Focused()), filler() | flex}));
+    }
+
+    bool OnEvent(ftxui::Event event) override {
+        using namespace ftxui;
+        if (event == Event::ArrowDown) { _list->move_selection(1);  return true; }
+        if (event == Event::ArrowUp)   { _list->move_selection(-1); return true; }
+        if (event == Event::Return)    { _list->trigger_select();    return true; }
+        return false;
+    }
+
+private:
+    SecurityList* _list;
+};
+
+} // namespace
 
 SecurityList::SecurityList()
 {
@@ -57,49 +86,30 @@ SecurityList::~SecurityList()
 void 
 SecurityList::_load_tickers(void) 
 {
-    // First, get data path:
     const char* src_dir_env = std::getenv("CMAKE_SRC_DIR");
     std::string src_dir = src_dir_env ? src_dir_env : ".";
     std::string ticker_file = src_dir + _ticker_path;
 
-    // Open the file
     std::ifstream file(ticker_file);
     if (!file.is_open()) {
-        std::cerr << "Failed to open file: " << ticker_file << std::endl;
-        
-        // For testing, add some default tickers if file can't be opened
         _tickers = {"AAPL", "MSFT", "GOOG", "AMZN", "META"};
         return;
     }
 
-    // Read each line and store it in the vector
     std::string line;
     while (std::getline(file, line)) {
-        if (!line.empty()) {
+        if (!line.empty())
             _tickers.push_back(line);
-        }
     }
-
-    // Close the file
-    file.close();
-
-    // Print the tickers to verify
-    std::cout << "Loaded tickers: ";
-    for (const auto& ticker : _tickers) {
-        std::cout << ticker << " ";
-    }
-    std::cout << std::endl;
 }
 
 void 
 SecurityList::_update_mock_prices() 
 {
-    // Random number generation for mock price changes
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_real_distribution<> price_change(-3.0, 3.0);
     
-    // Get current time for last update
     auto now = std::chrono::system_clock::now();
     auto in_time_t = std::chrono::system_clock::to_time_t(now);
     std::tm tm_buffer;
@@ -109,13 +119,11 @@ SecurityList::_update_mock_prices()
     time_ss << std::put_time(&tm_buffer, "%H:%M:%S");
     std::string current_time = time_ss.str();
     
-    // Update each security's price
+    std::lock_guard<std::mutex> lock(_data_mutex);
     for (auto& [ticker, data] : _securities_data) {
         double change = price_change(gen);
         double old_price = data.price;
-        data.price += change;
-        if (data.price < 1.0) data.price = 1.0;  // Prevent negative prices
-        
+        data.price = std::max(1.0, data.price + change);
         data.change = data.price - old_price;
         data.change_percent = (data.change / old_price) * 100.0;
         data.last_update = current_time;
@@ -125,29 +133,19 @@ SecurityList::_update_mock_prices()
 std::vector<std::vector<std::string>>
 SecurityList::_generate_table_data() 
 {
+    // Caller must hold _data_mutex
     std::vector<std::vector<std::string>> table_data;
-    
-    // Add header row
     table_data.push_back({"Ticker", "Price", "Chg", "Chg%", "Last Update"});
     
-    // Add data rows
     for (const auto& ticker : _tickers) {
-        if (_securities_data.find(ticker) != _securities_data.end()) {
-            const auto& data = _securities_data[ticker];
-            
-            std::stringstream price_ss, change_ss, change_percent_ss;
-            price_ss << std::fixed << std::setprecision(2) << data.price;
-            change_ss << std::fixed << std::setprecision(2) << data.change;
-            change_percent_ss << std::fixed << std::setprecision(2) << data.change_percent << "%";
-            
-            table_data.push_back({
-                data.ticker,
-                price_ss.str(),
-                change_ss.str(),
-                change_percent_ss.str(),
-                data.last_update
-            });
-        }
+        const auto& data = _securities_data.at(ticker);
+        std::stringstream price_ss, change_ss, pct_ss;
+        price_ss  << std::fixed << std::setprecision(2) << data.price;
+        change_ss << std::fixed << std::setprecision(2) << data.change;
+        pct_ss    << std::fixed << std::setprecision(2) << data.change_percent << "%";
+        table_data.push_back({
+            data.ticker, price_ss.str(), change_ss.str(), pct_ss.str(), data.last_update
+        });
     }
     
     return table_data;
@@ -160,33 +158,32 @@ SecurityList::update_data()
 }
 
 ftxui::Element 
-SecurityList::render_table() 
+SecurityList::render_table(bool focused) 
 {
     using namespace ftxui;
     
-    // Generate table data
+    std::lock_guard<std::mutex> lock(_data_mutex);
     auto table_data = _generate_table_data();
-    
-    // Create table
     auto table = Table(table_data);
     
-    // Style the table
     table.SelectAll().Border(LIGHT);
-    
-    // Style header row
     table.SelectRow(0).Decorate(bold);
     table.SelectRow(0).Border(DOUBLE);
+    table.SelectColumn(1).DecorateCells(align_right);
+    table.SelectColumn(2).DecorateCells(align_right);
+    table.SelectColumn(3).DecorateCells(align_right);
+
+    // Selection highlight (applied before change colors so colors take precedence)
+    int sel_row = _selected_index + 1;
+    if (sel_row > 0 && sel_row < (int)table_data.size()) {
+        if (focused)
+            table.SelectRow(sel_row).Decorate(inverted);
+        else
+            table.SelectRow(sel_row).Decorate(bold);
+    }
     
-    // Align numbers to the right
-    table.SelectColumn(1).DecorateCells(align_right);  // Price
-    table.SelectColumn(2).DecorateCells(align_right);  // Change
-    table.SelectColumn(3).DecorateCells(align_right);  // Change %
-    
-    // Color the changes (green for positive, red for negative)
-    for (size_t i = 1; i < table_data.size(); i++) {
-        const auto& ticker = table_data[i][0];
-        const auto& data = _securities_data[ticker];
-        
+    for (int i = 1; i < (int)table_data.size(); i++) {
+        const auto& data = _securities_data.at(table_data[i][0]);
         if (data.change > 0) {
             table.SelectCell(i, 2).Decorate(color(Color::Green));
             table.SelectCell(i, 3).Decorate(color(Color::Green));
@@ -202,15 +199,74 @@ SecurityList::render_table()
 ftxui::Component 
 SecurityList::create_component() 
 {
-    using namespace ftxui;
+    return ftxui::Make<SecuritiesComponent>(this);
+}
+
+void 
+SecurityList::add_ticker(const std::string& ticker) 
+{
+    std::lock_guard<std::mutex> lock(_data_mutex);
+    for (const auto& t : _tickers)
+        if (t == ticker) return;
+    _tickers.push_back(ticker);
+    _securities_data[ticker] = {ticker, 100.0, 0.0, 0.0, "--:--:--"};
+}
+
+void 
+SecurityList::remove_ticker(const std::string& ticker) 
+{
+    std::lock_guard<std::mutex> lock(_data_mutex);
+    _tickers.erase(std::remove(_tickers.begin(), _tickers.end(), ticker), _tickers.end());
+    _securities_data.erase(ticker);
+    if (_selected_index >= (int)_tickers.size())
+        _selected_index = std::max(0, (int)_tickers.size() - 1);
+}
+
+void 
+SecurityList::move_selection(int delta) 
+{
+    std::lock_guard<std::mutex> lock(_data_mutex);
+    if (_tickers.empty()) return;
+    _selected_index = std::clamp(_selected_index + delta, 0, (int)_tickers.size() - 1);
+}
+
+void 
+SecurityList::trigger_select() 
+{
+    std::function<void(const std::string&)> cb;
+    std::string ticker;
+    {
+        std::lock_guard<std::mutex> lock(_data_mutex);
+        if (_tickers.empty() || !_on_select) return;
+        cb = _on_select;
+        ticker = _tickers[_selected_index];
+    }
+    cb(ticker);
+}
+
+std::string 
+SecurityList::selected_ticker() const 
+{
+    std::lock_guard<std::mutex> lock(_data_mutex);
+    if (_tickers.empty()) return "";
+    return _tickers[_selected_index];
+}
+
+void 
+SecurityList::set_on_select(std::function<void(const std::string&)> cb) 
+{
+    _on_select = std::move(cb);
+}
+
+void 
+SecurityList::save_tickers() const 
+{
+    const char* src_dir_env = std::getenv("CMAKE_SRC_DIR");
+    std::string src_dir = src_dir_env ? src_dir_env : ".";
+    std::string ticker_file = src_dir + _ticker_path;
     
-    return Renderer([this] {
-        return 
-        window(text("Securities"), 
-                hbox({
-                    render_table(),
-                    filler() | flex,
-                })
-            ); // EndWindow
-    }); // EndRenderer
+    std::ofstream file(ticker_file);
+    std::lock_guard<std::mutex> lock(_data_mutex);
+    for (const auto& ticker : _tickers)
+        file << ticker << '\n';
 }
