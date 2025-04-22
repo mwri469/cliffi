@@ -6,22 +6,22 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include <thread>
-#include <random>
 #include <fstream>
 #include <cstdlib> 
 #include <sstream>
 #include <iomanip> 
 #include <iostream>
+#include <random>
+#include <thread>
 
 #include "list.hpp"
 #include "ftxui/util/ref.hpp"
-#include "ftxui/dom/table.hpp"
 #include "ftxui/dom/elements.hpp"
 #include "ftxui/component/component.hpp"
 #include "ftxui/component/captured_mouse.hpp"
 #include "ftxui/component/component_base.hpp"
 #include "ftxui/component/screen_interactive.hpp"
+#include "ftxui/dom/table.hpp"
 
 SecurityList::SecurityList()
 {
@@ -205,6 +205,12 @@ SecurityList::create_component()
     using namespace ftxui;
     
     return Renderer([this] {
-        return window(text("Securities"), render_table());
-    });
+        return 
+        window(text("Securities"), 
+                hbox({
+                    render_table(),
+                    filler() | flex,
+                })
+            ); // EndWindow
+    }); // EndRenderer
 }

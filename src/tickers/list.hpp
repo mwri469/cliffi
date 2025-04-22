@@ -4,21 +4,21 @@
 */
 #pragma once
 
-#include <map>
 #include <chrono>
 #include <memory>
 #include <string>
 #include <vector>
 #include <sstream>
 #include <iomanip>
+#include <map>
 
-#include "ftxui/util/ref.hpp"
-#include "ftxui/dom/table.hpp"
-#include "ftxui/dom/elements.hpp"
+#include "ftxui/component/captured_mouse.hpp"
 #include "ftxui/component/component.hpp"
 #include "ftxui/component/component_base.hpp"
-#include "ftxui/component/captured_mouse.hpp"
 #include "ftxui/component/screen_interactive.hpp"
+#include "ftxui/dom/elements.hpp"
+#include "ftxui/dom/table.hpp"
+#include "ftxui/util/ref.hpp"
 
 struct SecurityData {
     std::string ticker;
@@ -28,29 +28,29 @@ struct SecurityData {
     std::string last_update;
 };
 
-class SecurityList
-{
+class SecurityList {
 // Functions
 private:
-    void                                    _load_tickers();
-    void                                    _update_mock_prices(); // For mock data
-    std::vector<std::vector<std::string>>   _generate_table_data();
+    void _load_tickers();
+    void _update_mock_prices(); // For mock data
+    std::vector<std::vector<std::string>> _generate_table_data();
+
 public:
     SecurityList();
     ~SecurityList();
-
-    void                update_data();
-    ftxui::Element      render_table();
-    ftxui::Component    create_component();
+    
+    void update_data();
+    ftxui::Element render_table();
+    ftxui::Component create_component();
 
 // Attributes
 private:
-    std::string                             _ticker_path = "/../assets/tickers.txt";
-    std::vector<std::string>                _tickers;
-    std::map<std::string, SecurityData>     _securities_data;
-    std::atomic<bool>                       _is_running = true;
-    std::thread                             _update_thread;
+    std::string _ticker_path = "/../assets/tickers.txt";
+    std::vector<std::string> _tickers;
+    std::map<std::string, SecurityData> _securities_data;
+    std::atomic<bool> _is_running = true;
+    std::thread _update_thread;
 
 public:
-    std::atomic<bool>&                      is_running() { return _is_running; }
+    std::atomic<bool>& is_running() { return _is_running; }
 };

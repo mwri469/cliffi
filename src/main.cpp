@@ -7,6 +7,7 @@
 #include <string>
 #include <iomanip> 
 #include <sstream>
+#include <thread>
 
 #include "tickers/list.hpp"
 #include "ftxui/util/ref.hpp"
@@ -27,6 +28,9 @@ main(void)
     std::atomic<bool> running = true;
     Component ui;
 
+    // Create security list
+    auto securities = std::make_shared<SecurityList>();
+
     auto time_thread = std::thread([&] {
         while (running) {
             auto now = std::chrono::system_clock::now();
@@ -44,9 +48,6 @@ main(void)
         }
     });       
 
-    // Create security list
-    auto securities = std::make_shared<SecurityList>();
-
     Component input_search = Input(&search, "");
     Component input_cmd = Input(&cmd, "/");
     Component securities_component = securities->create_component();
@@ -60,11 +61,12 @@ main(void)
     auto renderer = Renderer(component, [&] {    
         return vbox({
             hbox({
-                window(text("Search"), input_search->Render())      | flex,
-                window(text("Cmd"), input_cmd->Render())            | size(WIDTH, EQUAL, 10),
-                window(text("Time"), text(time_str))                | size(WIDTH, EQUAL, 10),
-            }), window(text("UI"), securities_component->Render())  | flex,
-            });
+                window(text("Search"), input_search->Render())  | flex,
+                window(text("Cmd"), input_cmd->Render())        | size(WIDTH, EQUAL, 10),
+                window(text("Time"), text(time_str))            | size(WIDTH, EQUAL, 10),
+            }),
+            window(text("Context"), securities_component->Render())   | flex,
+        });
     });
 
     auto screen = ScreenInteractive::Fullscreen();
@@ -73,6 +75,7 @@ main(void)
     // Cleanup
     running = false;
     securities->is_running() = false;
+    
     if (time_thread.joinable()) {
         time_thread.join();
     }
