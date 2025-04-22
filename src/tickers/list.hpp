@@ -36,7 +36,7 @@ private:
     void                                    _update_mock_prices(); // For mock data
     std::vector<std::vector<std::string>>   _generate_table_data();
 public:
-    SecurityList(/* args */);
+    SecurityList();
     ~SecurityList();
 
     void                update_data();

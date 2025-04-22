@@ -24,7 +24,10 @@ FetchContent_Declare(curl
 FetchContent_MakeAvailable(ftxui)
 FetchContent_MakeAvailable(curl)
 
-find_package(curl REQUIRED)
+add_library(${project_name}-lib
+            ${CMAKE_SOURCE_DIR}/src/tickers/list.cpp
+            ${CMAKE_SOURCE_DIR}/src/tickers/list.hpp
+)
 
 ###############################################################
 ## Install ####################################################
@@ -32,11 +35,21 @@ find_package(curl REQUIRED)
 
 project(diffi LANGUAGES CXX VERSION 1.0.0)
 add_executable(diffi src/main.cpp)
+
+target_link_libraries(${project_name}-lib
+    PRIVATE
+        CURL::libcurl
+        ftxui::screen
+        ftxui::dom
+        ftxui::component
+)
 target_link_libraries(diffi
     PRIVATE
-    CURL::libcurl
-    ftxui::screen
-    ftxui::dom
-    ftxui::component
-)
+        ${project_name}-lib
+        CURL::libcurl
+        ftxui::screen
+        ftxui::dom
+        ftxui::component
 
+)
+    
