@@ -24,6 +24,7 @@ FetchContent_Declare(curl
 FetchContent_MakeAvailable(ftxui)
 FetchContent_MakeAvailable(curl)
 
+
 add_library(${project_name}-lib
             ${CMAKE_SOURCE_DIR}/src/tickers/list.cpp
             ${CMAKE_SOURCE_DIR}/src/tickers/list.hpp
