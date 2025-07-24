@@ -28,13 +28,21 @@ add_library(${project_name}-lib
             ${CMAKE_SOURCE_DIR}/src/tickers/list.cpp
             ${CMAKE_SOURCE_DIR}/src/tickers/list.hpp
 )
+find_package(curl REQUIRED)
 
 ###############################################################
 ## Install ####################################################
 ###############################################################
 
-project(diffi LANGUAGES CXX VERSION 1.0.0)
-add_executable(diffi src/main.cpp)
+project(cliffi LANGUAGES CXX VERSION 1.0.0)
+add_executable(cliffi src/main.cpp)
+target_link_libraries(cliffi
+    PRIVATE
+    CURL::libcurl
+    ftxui::screen
+    ftxui::dom
+    ftxui::component
+)
 
 target_link_libraries(${project_name}-lib
     PRIVATE
@@ -43,7 +51,7 @@ target_link_libraries(${project_name}-lib
         ftxui::dom
         ftxui::component
 )
-target_link_libraries(diffi
+target_link_libraries(cliffi
     PRIVATE
         ${project_name}-lib
         CURL::libcurl
