@@ -248,9 +248,10 @@ SecurityList::set_on_select(std::function<void(const std::string&)> cb)
 void 
 SecurityList::save_tickers() const 
 {
+    std::lock_guard<std::mutex> lock(_data_mutex);
     std::ofstream file(_ticker_path);
     if (!file.is_open()) file.open("../" + _ticker_path);
-    std::lock_guard<std::mutex> lock(_data_mutex);
+    if (!file.is_open()) return;
     for (const auto& ticker : _tickers)
         file << ticker << '\n';
 }
