@@ -15,7 +15,7 @@ set(ENV{CMAKE_SRC_DIR} ${CMAKE_SRC_DIR})
 
 FetchContent_Declare(ftxui
     GIT_REPOSITORY https://github.com/ArthurSonzogni/ftxui
-    GIT_TAG main
+    GIT_TAG v5.0.0
 )
 FetchContent_Declare(curl
     GIT_REPOSITORY https://github.com/curl/curl.git
@@ -28,15 +28,15 @@ FetchContent_MakeAvailable(ftxui curl)
 ## Install ####################################################
 ###############################################################
 
-add_library(${PROJECT_NAME}-lib
+add_library(${PROJECT_NAME}-lib STATIC
     ${CMAKE_SOURCE_DIR}/src/tickers/list.cpp
     ${CMAKE_SOURCE_DIR}/src/tickers/list.hpp
     ${CMAKE_SOURCE_DIR}/src/commands/handler.cpp
     ${CMAKE_SOURCE_DIR}/src/commands/handler.hpp
     ${CMAKE_SOURCE_DIR}/src/search/search.cpp
     ${CMAKE_SOURCE_DIR}/src/search/search.hpp
-    ${CMAKE_SOURCE_DIR}/src/api/yahoo.cpp
-    ${CMAKE_SOURCE_DIR}/src/api/yahoo.hpp
+    ${CMAKE_SOURCE_DIR}/src/api/lse.cpp
+    ${CMAKE_SOURCE_DIR}/src/api/lse.hpp
     ${CMAKE_SOURCE_DIR}/src/graph/chart.cpp
     ${CMAKE_SOURCE_DIR}/src/graph/chart.hpp
 )

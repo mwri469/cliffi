@@ -15,6 +15,9 @@ execute_command(const std::string& raw_cmd, SecurityList& securities,
     auto start = raw_cmd.find_first_not_of(" \t");
     if (start == std::string::npos) return;
     std::string cmd = raw_cmd.substr(start);
+    auto end = cmd.find_last_not_of(" \t\r\n");
+    if (end == std::string::npos) return;
+    cmd.resize(end + 1);
 
     // Strip leading slash if present
     if (!cmd.empty() && cmd[0] == '/') cmd = cmd.substr(1);

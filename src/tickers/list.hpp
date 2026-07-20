@@ -36,7 +36,7 @@ class SecurityList {
 // Functions
 private:
     void _load_tickers();
-    void _update_mock_prices(); // For mock data
+    void _update_prices();
     std::vector<std::vector<std::string>> _generate_table_data();
 
 public:
@@ -58,7 +58,7 @@ public:
 
 // Attributes
 private:
-    std::string _ticker_path = "/../assets/tickers.txt";
+    std::string _ticker_path = "assets/tickers.txt";
     std::vector<std::string> _tickers;
     std::map<std::string, SecurityData> _securities_data;
     std::atomic<bool> _is_running = true;

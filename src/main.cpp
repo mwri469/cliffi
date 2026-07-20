@@ -6,7 +6,7 @@
 #include <atomic>
 #include <cctype>
 #include <chrono>
-#include <cstdlib>
+#include <fstream>
 #include <iomanip>
 #include <memory>
 #include <mutex>
@@ -18,7 +18,7 @@
 #include "tickers/list.hpp"
 #include "commands/handler.hpp"
 #include "search/search.hpp"
-#include "api/yahoo.hpp"
+#include "api/lse.hpp"
 #include "graph/chart.hpp"
 #include "ftxui/component/component.hpp"
 #include "ftxui/component/component_options.hpp"
@@ -47,10 +47,12 @@ main(void)
     auto screen    = ScreenInteractive::Fullscreen();
     auto securities = std::make_shared<SecurityList>();
 
-    // Resolve asset paths from build-time env var
-    const char* src_dir_env = std::getenv("CMAKE_SRC_DIR");
-    std::string src_dir   = src_dir_env ? src_dir_env : ".";
-    std::string symbols_path = src_dir + "/../assets/symbols.txt";
+    // Resolve asset paths — try CWD (project root) then parent (if running from build/)
+    std::string symbols_path = "assets/symbols.txt";
+    {
+        std::ifstream test(symbols_path);
+        if (!test.is_open()) symbols_path = "../assets/symbols.txt";
+    }
 
     // When the user selects a ticker: fetch intraday data asynchronously
     securities->set_on_select([&](const std::string& ticker) {
@@ -63,7 +65,7 @@ main(void)
             graph_prices.clear();
         }
         std::thread([&, ticker, my_gen] {
-            auto prices = Yahoo::fetch_intraday(ticker);
+            auto prices = LSE::fetch_intraday(ticker);
             if (my_gen != graph_gen) return; // superseded by a newer request
             {
                 std::lock_guard<std::mutex> lock(graph_prices_mutex);
@@ -93,7 +95,19 @@ main(void)
     // Search input — Enter searches symbols file and adds first match
     InputOption search_opt;
     search_opt.on_enter = [&] {
+        auto first = search_str.find_first_not_of(" \t\r\n");
+        if (first == std::string::npos) {
+            search_str.clear();
+            return;
+        }
+        auto last = search_str.find_last_not_of(" \t\r\n");
+        search_str = search_str.substr(first, last - first + 1);
         if (search_str.empty()) return;
+        if (search_str[0] == '/') {
+            execute_command(search_str, *securities, running, screen);
+            search_str.clear();
+            return;
+        }
         auto results = search_symbols(search_str, symbols_path);
         if (!results.empty()) {
             // Prefer an exact match if one exists
@@ -105,7 +119,11 @@ main(void)
             securities->add_ticker(match);
             status_msg = "Added: " + match;
         } else {
-            status_msg = "Not found: " + search_str;
+            std::ifstream verify(symbols_path);
+            if (!verify.is_open())
+                status_msg = "Symbols file not found: " + symbols_path;
+            else
+                status_msg = "Not found: " + search_str;
         }
         search_str.clear();
     };

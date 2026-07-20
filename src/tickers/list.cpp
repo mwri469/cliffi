@@ -4,18 +4,17 @@
 */
 #include <algorithm>
 #include <chrono>
-#include <cstdlib>
 #include <fstream>
 #include <functional>
 #include <iomanip>
 #include <memory>
-#include <random>
 #include <sstream>
 #include <string>
 #include <thread>
 #include <vector>
 
 #include "list.hpp"
+#include "api/lse.hpp"
 #include "ftxui/component/component.hpp"
 #include "ftxui/component/component_base.hpp"
 #include "ftxui/component/event.hpp"
@@ -32,7 +31,7 @@ public:
 
     bool Focusable() const override { return true; }
 
-    ftxui::Element OnRender() override {
+    ftxui::Element Render() override {
         using namespace ftxui;
         return window(text("Securities"),
             hbox({_list->render_table(Focused()), filler() | flex}));
@@ -64,13 +63,9 @@ SecurityList::SecurityList()
     // Start update thread
     _update_thread = std::thread([this] {
         while (_is_running) {
-            _update_mock_prices();
-            
-            // Request redraw
+            _update_prices();
             ftxui::ScreenInteractive::Active()->PostEvent(ftxui::Event::Custom);
-            
-            // Update every 2 seconds
-            std::this_thread::sleep_for(std::chrono::seconds(2));
+            std::this_thread::sleep_for(std::chrono::seconds(15));
         }
     });
 }
@@ -86,11 +81,8 @@ SecurityList::~SecurityList()
 void 
 SecurityList::_load_tickers(void) 
 {
-    const char* src_dir_env = std::getenv("CMAKE_SRC_DIR");
-    std::string src_dir = src_dir_env ? src_dir_env : ".";
-    std::string ticker_file = src_dir + _ticker_path;
-
-    std::ifstream file(ticker_file);
+    std::ifstream file(_ticker_path);
+    if (!file.is_open()) file.open("../" + _ticker_path);
     if (!file.is_open()) {
         _tickers = {"AAPL", "MSFT", "GOOG", "AMZN", "META"};
         return;
@@ -98,35 +90,27 @@ SecurityList::_load_tickers(void)
 
     std::string line;
     while (std::getline(file, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
         if (!line.empty())
             _tickers.push_back(line);
     }
 }
 
 void 
-SecurityList::_update_mock_prices() 
+SecurityList::_update_prices() 
 {
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution<> price_change(-3.0, 3.0);
-    
-    auto now = std::chrono::system_clock::now();
-    auto in_time_t = std::chrono::system_clock::to_time_t(now);
-    std::tm tm_buffer;
-    localtime_r(&in_time_t, &tm_buffer);
-    
-    std::stringstream time_ss;
-    time_ss << std::put_time(&tm_buffer, "%H:%M:%S");
-    std::string current_time = time_ss.str();
-    
-    std::lock_guard<std::mutex> lock(_data_mutex);
-    for (auto& [ticker, data] : _securities_data) {
-        double change = price_change(gen);
-        double old_price = data.price;
-        data.price = std::max(1.0, data.price + change);
-        data.change = data.price - old_price;
-        data.change_percent = (data.change / old_price) * 100.0;
-        data.last_update = current_time;
+    std::vector<std::string> tickers_copy;
+    {
+        std::lock_guard<std::mutex> lock(_data_mutex);
+        tickers_copy = _tickers;
+    }
+
+    for (const auto& ticker : tickers_copy) {
+        if (!_is_running) return;
+        auto quote = LSE::fetch_quote(ticker);
+        if (quote.price <= 0.0) continue;
+        std::lock_guard<std::mutex> lock(_data_mutex);
+        _securities_data[ticker] = quote;
     }
 }
 
@@ -154,7 +138,7 @@ SecurityList::_generate_table_data()
 void 
 SecurityList::update_data() 
 {
-    _update_mock_prices();
+    _update_prices();
 }
 
 ftxui::Element 
@@ -261,11 +245,8 @@ SecurityList::set_on_select(std::function<void(const std::string&)> cb)
 void 
 SecurityList::save_tickers() const 
 {
-    const char* src_dir_env = std::getenv("CMAKE_SRC_DIR");
-    std::string src_dir = src_dir_env ? src_dir_env : ".";
-    std::string ticker_file = src_dir + _ticker_path;
-    
-    std::ofstream file(ticker_file);
+    std::ofstream file(_ticker_path);
+    if (!file.is_open()) file.open("../" + _ticker_path);
     std::lock_guard<std::mutex> lock(_data_mutex);
     for (const auto& ticker : _tickers)
         file << ticker << '\n';

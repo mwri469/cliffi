@@ -17,10 +17,12 @@ search_symbols(const std::string& query, const std::string& symbols_path)
     std::transform(upper_query.begin(), upper_query.end(), upper_query.begin(), ::toupper);
 
     std::ifstream file(symbols_path);
+    if (!file.is_open()) file.open("../" + symbols_path);
     std::vector<std::string> exact, partial;
     std::string line;
 
     while (std::getline(file, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
         if (line.empty()) continue;
         std::string upper_line = line;
         std::transform(upper_line.begin(), upper_line.end(), upper_line.begin(), ::toupper);
