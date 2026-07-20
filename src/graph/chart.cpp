@@ -22,6 +22,7 @@ render_chart(const std::vector<double>& prices, const std::string& ticker)
 
     // Capture by value so the lambda is safe across threads
     auto graph_fn = [prices, min_p, range](int width, int height) -> std::vector<int> {
+        if (width <= 0 || height <= 0) return {};
         std::vector<int> out(width, 0);
         int n = (int)prices.size();
         for (int x = 0; x < width; ++x) {
