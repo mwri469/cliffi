@@ -112,7 +112,8 @@ main(void)
         if (!results.empty()) {
             // Prefer an exact match if one exists
             std::string upper = search_str;
-            std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
+            std::transform(upper.begin(), upper.end(), upper.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
             std::string match = results[0];
             for (const auto& r : results)
                 if (r == upper) { match = r; break; }
