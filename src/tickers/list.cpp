@@ -109,7 +109,10 @@ SecurityList::_update_prices()
         if (!_is_running) return;
         auto quote = LSE::fetch_quote(ticker);
         if (quote.price <= 0.0) continue;
+
         std::lock_guard<std::mutex> lock(_data_mutex);
+        if (std::find(_tickers.begin(), _tickers.end(), ticker) == _tickers.end())
+            continue; // removed while fetch was in-flight
         _securities_data[ticker] = quote;
     }
 }
