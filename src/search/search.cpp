@@ -14,7 +14,8 @@ search_symbols(const std::string& query, const std::string& symbols_path)
     if (query.empty()) return {};
 
     std::string upper_query = query;
-    std::transform(upper_query.begin(), upper_query.end(), upper_query.begin(), ::toupper);
+    std::transform(upper_query.begin(), upper_query.end(), upper_query.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
 
     std::ifstream file(symbols_path);
     if (!file.is_open()) file.open("../" + symbols_path);
