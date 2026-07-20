@@ -84,7 +84,11 @@ double parse_json_number(const std::string& json, const std::string& key, size_t
     pos += needle.size();
     while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) pos++;
     if (pos >= json.size() || json[pos] == 'n') return 0.0;
-    return std::stod(json.substr(pos));
+    try {
+        return std::stod(json.substr(pos));
+    } catch (...) {
+        return 0.0;
+    }
 }
 
 // Find the start of each object in a JSON array.
