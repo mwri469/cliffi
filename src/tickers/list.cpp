@@ -64,7 +64,7 @@ SecurityList::SecurityList()
     _update_thread = std::thread([this] {
         while (_is_running) {
             _update_prices();
-            ftxui::ScreenInteractive::Active()->PostEvent(ftxui::Event::Custom);
+            if (auto* s = ftxui::ScreenInteractive::Active()) s->PostEvent(ftxui::Event::Custom);
             std::this_thread::sleep_for(std::chrono::seconds(15));
         }
     });
