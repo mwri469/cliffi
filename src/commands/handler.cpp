@@ -24,7 +24,8 @@ execute_command(const std::string& raw_cmd, SecurityList& securities,
 
     // Normalise to lowercase for comparison
     std::string lower = cmd;
-    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+    std::transform(lower.begin(), lower.end(), lower.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
 
     if (lower == "quit") {
         securities.save_tickers();
